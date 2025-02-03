@@ -1,0 +1,1152 @@
+#lang racket/gui
+
+;; Representa as diferentes salas ou locais do escape room.
+(struct Ambiente (nome descricao objetos saidas enigmas))
+
+
+;; Elementos interativos do ambiente.
+(struct Objeto (nome descricao interacao))
+
+
+;; Desafios que precisam ser resolvidos pelos jogadores.
+(struct Enigma (descricao solucao pistas efeito))
+
+
+;; Representa o participante do escape room.
+(struct Jogador (nome posicao inventario localizacao))
+
+
+;; Representa a posição atual do jogador no mapa
+(struct Posicao (x y))
+
+
+;; Representa a narrativa inicial do jogo
+(struct Narrativa (textos imagens))
+
+
+;; Representa o dialogo durante o jogo
+(struct Dialogo (inicio pilha livro quiz pedido armazem))
+
+
+;; Representa o dialogo final de cada enigma durante o jogo
+(struct Dialogo-finais (pilha livro quiz pedido armazem armario-a armario-v))
+
+
+;; Funções relacionadas à lógica do jogo
+(provide (all-defined-out))
+
+
+
+
+;; ############################################ RESOLUÇÃO DOS ENIGMAS ##################################################
+
+; Função que verifica se o enigma foi completado corretamente!
+(define (resolver-enigma enigma resposta)
+  (cond
+    [(empty? enigma)
+     #t]
+
+    [else
+     (and
+      (equal? (first enigma) (first resposta))
+      (resolver-enigma (rest enigma) (rest resposta)))]
+    )
+  ) 
+
+
+;; ############################################ FINALIZADO ##################################################
+
+
+
+;; ############################################ ESTRUTURA DOS ENIGMAS ##################################################
+
+; Função para criar os enigmas
+(define (criar-enigma descricao solucao pistas efeito)
+  (Enigma
+   descricao
+   solucao
+   pistas
+   efeito
+   )
+  )
+
+
+; Devolve a descricao do enigma
+(define (get-enigma-desc enig)
+  (Enigma-descricao enig)
+  )
+
+; Devolve a solucao do enigma
+(define (get-enigma-solu enig)
+  (Enigma-solucao enig)
+  )
+
+; Devolve a pista do enigma
+(define (get-enigma-pis enig)
+  (Enigma-pistas enig)
+  )
+
+; Devolve o efeito do enigma
+(define (get-enigma-efei enig)
+  (Enigma-efeito enig)
+  )
+
+
+
+; Enigma da pilha de prato
+(define prato(criar-enigma
+              (list
+               "Olha só essa pilha de pratos... Parece que cada prato foi colocado com todo cuidado, um por cima do outro, mas agora está prestes a desabar!"
+               "E o mais curioso: para resolver isso, só dá pra mexer no último prato colocado primeiro. Um movimento errado e... bem, melhor nem pensar no que acontece.")
+              (list 6 5 4 3 2 1)
+              "Sou a base principal da cozinha; sem mim, a comida não seria servida. Contudo, em minha pilha, a ordem é tudo."
+              "chave V1")
+  )
+
+; Estado do Enigma pilha
+(define estado-prato #f)
+
+; Altera o estado do Enigma pilha, quando o enigma for concluído.
+(define (altera-estado-prato)
+  (set! estado-prato #t)
+  )
+
+
+
+
+; Enigma do livro
+(define livro(criar-enigma
+              (list
+               "Ah, o Livro de Receitas, a essência da cozinha. Mas olhe para ele... que estado deplorável!"
+               "O sub-chefe robô, afetado pelo algoritmo caótico, embaralhou completamente as receitas, refletindo o caos que tomou conta do sistema."
+               "Suas páginas parecem sussurrar, implorando por uma sequência harmoniosa... talvez algo que siga o ritmo natural das letras.")
+              (list "Almôndega" "Bolo" "Coxinha" "Empada" "Farofa" "Hambúrger" "Kibe" "Lasanha" "Nhoque" "Paçoca" "Ravioli" "Salpicão")
+              "O que está guardado no segredo de um armário pode revelar muito mais do que páginas viradas. Às vezes, a chave para encontrar o caminho está em seguir as primeiras letras de cada história."
+              "1315")
+  )
+
+; Estado do Enigma livro
+(define estado-livro #f)
+
+; Funções para alterar o estado do Enigma livro
+(define (altera-estado-livro)
+  (set! estado-livro #t))
+
+
+; Enigma do quiz
+(define quiz(criar-enigma
+             (list
+              "Você está indo bem, mas agora precisamos testar sua lógica e conhecimento. Este é o Quiz da Cozinha, onde conceitos fundamentais de programação orientada a objetos serão avaliados!")
+             (list "B" "B" "C" "A" "A")
+             "Para o próximo passo decifrar, Na bancada deves procurar. Um assistente digital está a esperar, Onde os chefs costumam anotar."
+             "18195")
+  )
+
+; Estado do Enigma quiz
+(define estado-quiz #f)
+
+; Funções para alterar o estado do Enigma quiz
+(define (altera-estado-quiz)
+  (set! estado-quiz #t))
+
+
+
+
+; Enigma de pedidos
+(define pedidos(criar-enigma
+                (list
+                 "Agora, você precisa organizar os pedidos. Lembre-se: demandas prioritárias sempre lideram, mas há um limite... cada demanda geral só pode ser 'passada' por até duas prioritárias."
+                 "O equilíbrio entre as necessidades é essencial para manter a harmonia.")
+                (list ".." "-." "...-" "." "-." "-" "---" ".-.")
+                "Para avançar na organização, Observe bem a multidão. Prioritário vem primeiro, sem hesitar, Mas cuidado: o equilíbrio é o segredo para continuar."
+                "chave A1")   ; Destranca uma gaveta do armario amarelo
+  )
+
+; Estado do Enigma quiz
+(define estado-pedidos #f)
+
+; Funções para alterar o estado do Enigma pedidos
+(define (altera-estado-pedidos)
+  (set! estado-pedidos #t))
+
+
+
+
+; Enigma do armazém
+(define armazem(criar-enigma
+                (list
+                 "Ah, finalmente algo está funcionando como deveria! Veja, o armazém está impecavelmente organizado, mas o ITEM SECRETO ainda está escondido."
+                 "Desta vez, você precisará realizar uma Busca Binária em duas etapas: primeiro, encontre a prateleira correta; depois, procure dentro dela pelo item exato."
+                 "Não se esqueça: não temos muito tempo.Corra o mais rápido que puder antes que o algoritmo perigoso saia de controle e colapse o sistema por completo!")
+                (list 7 636) ; Prateleira 7, Item 636.
+                "No armazém tudo é categorizado, Os ingredientes estão bem organizados. Siga os galhos com atenção, E o menor caminho trará a solução."
+                "chave A2")
+  )
+
+; Estado do Enigma Armazem
+(define estado-armazem #f)
+
+; Funções para alterar o estado do Enigma armazem
+(define (altera-estado-armazem)
+  (set! estado-armazem #t))
+
+
+;; ############################################ FINALIZADO ##################################################
+
+
+
+;; ############################################ FUNÇÕES DO ENIGMA PILHA DE PRATOS ##################################################
+
+; Instância de pilha-suja
+(define pilha-suja (list 1 2 3 4 5 6))
+
+; Variável intermediario entre prato-sujo e prato-limpo.
+(define lavar void)
+
+; Instância de pilha-limpa
+(define pilha-limpa '())
+
+
+;; Função de desempilhar
+(define (desempilha)
+  (cond
+    [(not (equal? lavar void)) ; Verifica se o intermediario tem algum item desempilhado.
+     void]
+
+    [else
+     (set! lavar (ultimo pilha-suja))
+     (set! pilha-suja (desempilha-rec pilha-suja))]
+    )
+  )
+
+
+; Retorna o elemento que será desempilhado
+(define (ultimo pilha)
+  (if (empty? (rest pilha))
+      (first pilha) ; Retorna o último elemento.
+      (ultimo (rest pilha)))) ; Continua a busca recursivamente.
+
+
+
+; Função recursiva que auxiliar o desempilha.
+(define (desempilha-rec pilha)
+  (cond
+    [(empty? (rest pilha))
+     '()]
+
+    [else
+     (cons (first pilha) (desempilha-rec (rest pilha)))]
+    )
+  )
+
+
+; Função de empilhar
+(define (empilha item)
+  (cond
+    [(equal? item void)
+     void]
+
+    [else
+     (set! pilha-limpa (append pilha-limpa (list item)))
+     (set! lavar void)]
+    )
+  )
+
+
+(define (concluido-pilha?)
+  (cond
+    [(resolver-enigma (Enigma-solucao prato) pilha-limpa)
+     (altera-estado-prato)
+     (altera-estado-pia-sup)
+     (add-item (get-enigma-efei prato))
+     ; Inicia o diálogo da descrição do Enigma Pilha de Pratos
+     (iniciar-sequencia-dialogos (get-narrador) (Dialogo-finais-pilha enigma-feito))]
+
+    [else
+     void]
+    ) 
+  )
+
+
+
+;; ############################################ FINALIZADO ##################################################
+
+
+
+;; ############################################ FUNÇÕES DO ENIGMA DO LIVRO ##################################################
+
+; Verifica se a gaveta pode ser aberta
+(define (aberto?)
+  ; Condição para verificar se a gaveta pode ser aberta ou não.
+  (when (esta-inv? (get-enigma-efei prato) (get-inventario))
+    (altera-estado-armario-verde))
+  )
+
+
+; Variáveis globais
+(define receitas-encontradas '())  ; Lista de receitas encontradas
+(define livro-receitas-completo #f)  ; Estado de conclusão do livro de receitas
+(define nome-receita '())
+
+; Adiciona a receita na lista
+(define (add-receita receita)
+  (set! receitas-encontradas (append receitas-encontradas (list receita)))
+  (set! nome-receita (append nome-receita (list (Receita-nome receita))))
+  )
+
+; Altera o estado da receita quando ela estiver completa
+(define (alter-estado-receita)
+  (set! livro-receitas-completo #t)
+  )
+
+
+; Função para resetar o puzzle do livro
+(define (reset-recipe-book)
+  (set! verificar-ativo #f)
+  (set! receitas-encontradas '())              ; Limpa a lista de receitas encontradas
+  (set! nome-receita '())
+  (set! livro-receitas-completo #f))            ; Reseta o estado de conclusão do livro
+
+
+; Estrutura de Receitas
+(struct Receita (nome descricao))
+
+; Receitas disponiveis e baguncadas
+(define receitas-disponiveis
+  (list
+    (Receita "Nhoque" "Pequenos pedaços de massa macia feitos de batata. -")
+    (Receita "Bolo" "Uma sobremesa clássica feita de massa assada, ideal para festas e celebrações. -")
+    (Receita "Lasanha" "Camadas de massa intercaladas com molho e queijo. -")
+    (Receita "Farofa" "Prato típico brasileiro feito de farinha de mandioca tostada.")
+    (Receita "Paçoca" "Doce brasileiro feito com amendoim triturado.")
+    (Receita "Coxinha" "Um salgado brasileiro em formato de gota, recheado com frango desfiado. .")
+    (Receita "Kibe" "Prato de origem árabe feito de carne moída e trigo. -")
+    (Receita "Hambúrger" "Carne moída modelada em formato redondo, grelhada ou frita.")
+    (Receita "Almôndega" "Bolinho de carne moída temperado, modelado à mão e geralmente servido com molho de tomate.")
+    (Receita "Salpicão" "Salada fria feita com frango desfiado, maionese e outros ingredientes.")
+    (Receita "Empada" "Massa recheada, geralmente assada. .")
+    (Receita "Ravioli" "Massa recheada em formato de quadrados.")))
+
+
+
+
+
+; Habilita o botao de verificar quando todas as receitas forem coletadas
+(define verificar-ativo #f)
+
+
+; Altera o estado do bota verificar
+(define (alter-botao-ver)
+  (set! verificar-ativo #t)
+  )
+
+; Mensagem ao clicar no botao resetar
+(define resetar-acao 
+  (lambda () 
+    (let ([resultado 
+           (message-box 
+            "Confirmar Reset" 
+            "Tem certeza que deseja reiniciar? Todas as receitas coletadas serão perdidas." 
+            #f 
+            '(yes-no))])
+      resultado)))
+
+
+(define (concluido-livro?)
+  (cond
+    [(resolver-enigma (Enigma-solucao livro) nome-receita)
+     (altera-estado-livro)
+     (altera-estado-armario-verde)
+     (add-item (get-enigma-efei livro))
+     ; Inicia o diálogo da descrição do Enigma livro
+     (iniciar-sequencia-dialogos (get-narrador) (Dialogo-finais-livro enigma-feito))]
+
+    [else
+     (message-box 
+      "Ordem Incorreta" 
+      "Ordem incorreta! Resete o enigma!" 
+      #f 
+      '(ok))]
+    )
+  )
+
+;; ############################################ FINALIZADO ##################################################
+
+
+
+;; ############################################ FUNÇÕES DO ENIGMA DO LIVRO ##################################################
+
+(define (concluido-quiz?)
+  (when (resolver-enigma (Enigma-solucao quiz) (list "B" "B" "C" "A" "A"))
+    (altera-estado-quiz)
+    (altera-estado-bancada-central)
+    (add-item (get-enigma-efei quiz))
+    ; Inicia o diálogo da descrição do Enigma livro
+    (iniciar-sequencia-dialogos (get-narrador) (Dialogo-finais-quiz enigma-feito))
+    )
+  )
+
+
+;; ############################################ FINALIZADO ##################################################
+
+
+
+;; ############################################ GESTÃO DOS OBJETOS E ESPAÇO DOS AMBIENTES NO JOGO ##################################################
+
+; Lista de objetos do armazém com suas coordenadas e dimensões
+(define objetos-armazem
+  (list
+   (list 210 670 400 80)   ; Estante 1 (horizontal, inferior esquerda)
+   (list 50 415 100 200)   ; Estante 2 (vertical, esquerda)
+   (list 50 175 100 200)   ; Estante 3 (vertical, esquerda)
+   (list 260 50 400 80)    ; Estante 4 (horizontal, superior esquerda)
+   (list 840 50 400 80)    ; Estante 5 (horizontal, superior direita)
+   (list 1350 175 100 200) ; Estante 6 (vertical, superior direita)
+   (list 1350 415 100 200) ; Estante 7 (vertical, inferior direita)
+   (list 890 670 400 80)   ; Estante 8 (horizontal, inferior direita)
+   (list 700 700 100 50))) ; Porta
+
+
+; Lista de objetos da cozinha com suas coordenadas e dimensões
+(define objetos-cozinha
+  (list
+   (list 50 320 200 170)    ; Geladeira
+   (list 750 320 270 170)   ; Fogão
+   (list 50 50 350 150)     ; Pia Superior
+   (list 750 600 300 150)   ; Pia Inferior
+   (list 400 50 150 150)    ; Lava Louças
+   (list 400 320 350 170)   ; Bancada Central
+   (list 500 600 250 150)   ; Bancada Inferior
+   (list 50 600 260 150)    ; Armário 1
+   (list 1190 600 260 150)  ; Armário 2
+   (list 1190 50 260 150)   ; Armário 3
+   (list 670 50 260 40)     ; Porta do armazém
+   (list 1400 320 50 150) ; Porta de saída
+   (list 1060 130 15 15)))   ; Byte 
+
+; Função para verificar colisão com margens mais suaves
+(define (verifica-colisao x y obj-amb)
+  (define tam-jogador 40)
+  (define margem-colisao 20)
+  
+  (define (colisao-com-objeto? obj)
+    (let ([obj-x (first obj)]
+          [obj-y (second obj)]
+          [obj-w (third obj)]
+          [obj-h (fourth obj)]
+          [player-center-x (+ x (/ tam-jogador 2))]
+          [player-center-y (+ y (/ tam-jogador 2))])
+      (and (< player-center-x (+ obj-x obj-w margem-colisao))
+           (> player-center-x (- obj-x margem-colisao))
+           (< player-center-y (+ obj-y obj-h margem-colisao))
+           (> player-center-y (- obj-y margem-colisao)))))
+
+  ; Função de alta ordem OrMap
+  (ormap colisao-com-objeto? obj-amb))
+
+
+; Função para verificar proximidade com objetos
+(define (objeto-proximo? player-x player-y obj-x obj-y obj-w obj-h)
+  (let ([distancia 35])
+    (or
+     (and (< (abs (- player-x obj-x)) distancia)
+          (>= player-y obj-y)
+          (<= player-y (+ obj-y obj-h)))
+     (and (< (abs (- player-x (+ obj-x obj-w))) distancia)
+          (>= player-y obj-y)
+          (<= player-y (+ obj-y obj-h)))
+     (and (< (abs (- player-y obj-y)) distancia)
+          (>= player-x obj-x)
+          (<= player-x (+ obj-x obj-w)))
+     (and (< (abs (- player-y (+ obj-y obj-h))) distancia)
+          (>= player-x obj-x)
+          (<= player-x (+ obj-x obj-w))))))
+
+
+;; ############################################ FINALIZADO ##################################################
+
+
+
+;; ############################################ INSTÂNCIAS E LÓGICA DOS OBJETOS NO SISTEMA DE COZINHA ##################################################
+
+; Função para criar o objeto
+(define (criar-objeto nome descricao interacao)
+  (Objeto
+   nome
+   descricao
+   interacao)
+  )
+
+; Devolve o nome do objeto
+(define (get-objeto-name obj)
+  (Objeto-nome obj)
+  )
+
+; Devolve a descrição do objeto de acordo com o estado dele.
+(define (get-objeto-desc obj)
+  (first (Objeto-descricao obj))
+  )
+
+; Devolve a interação do objeto de acordo com a posicao.
+(define (get-objeto-inte obj num)
+  (cond
+    [(= num 0)
+     (first (Objeto-interacao obj))]
+
+    [(= num 1)
+     (second (Objeto-interacao obj))]
+
+    [else
+     (third (Objeto-interacao obj))]
+    )
+  )
+
+
+;; Instâncias dos objetos do ambiente
+; GELADEIRA
+(define obj-geladeira 
+  (criar-objeto 
+   "Geladeira"
+   (list "Que barulho estranho... Parece que a geladeira está viva! Melhor não mexer muito.")
+   void)
+  )
+
+; FOGÃO
+(define obj-fogao 
+  (criar-objeto 
+   "Fogão"
+   (list "Uau, esse fogão parece ser de última geração... Pena que eu não sei usar.")
+   void)
+  )
+
+; PIA SUPERIOR
+(define obj-pia-sup 
+  (criar-objeto 
+   "Pia"
+   (list "Resolvido! Essa pilha de pratos guardava mais do que sujeira.")
+   (list "Desempilhar" "Lavar")) 
+  )
+
+; PIA INFERIOR
+(define obj-pia-inf 
+  (criar-objeto 
+   "Pia"
+   (list "Ok, abri a torneira... Mas parece que não tem água.")
+   void)
+  )
+
+; LAVA LOUÇAS
+(define obj-lava-loucas 
+  (criar-objeto 
+   "Lava louças"
+   (list "Ah, uma lava-louças! Pena que está quebrada. Quem sabe um dia eu consiga consertá-la.")
+   void)
+  )
+
+; BANCADA CENTRAL
+(define obj-bancada-cen
+  (criar-objeto 
+   "Bancada"
+   (list "Parece que vasculhar a bancada valeu a pena. Resolvido!")
+   (list "Tablet" "Quiz" "Pedidos"))
+  )
+
+; BANCADA INFERIOR
+(define obj-bancada-inf 
+  (criar-objeto 
+   "Bancada Inferior"
+   (list "A bancada está impecável, mas parece que foi esquecida pelo tempo.")
+   void)
+  )
+
+; ARMARIO VERDE
+(define obj-armario-verd
+  (criar-objeto 
+   "public armário"
+   (list "Esse armário verde guardava mais do que poeira. Um livro de receitas!")
+   (list "Porta"  "Gaveta"))
+  )
+
+; ARMARIO VERMELHO
+(define obj-armario-verm
+  (criar-objeto 
+   "private armário"
+   (list "Um armário vermelho está próximo à saída, como se escondesse algo vital."
+         "Achei a chave final! Esse armário estava guardando o que eu mais precisava.")
+   (list "Porta"  "Gaveta")) 
+  )
+
+; ARMARIO AMARELO
+(define obj-armario-amar
+  (criar-objeto 
+   "protected armário"
+   (list "Um armário amarelo discreto... e dentro dele, tinha uma chave e um papel cheio de mistério.")
+   (list "Porta"  "Gaveta"))
+  )
+
+; PORTA DO ARMAZÉM
+(define obj-porta-armazem 
+  (criar-objeto 
+   "Armazém"
+   (list "Essa porta está trancada... Parece que preciso de uma chave especial para abrir.")
+   void)
+  )
+
+; PORTA DE SAÍDA
+(define obj-porta-saida 
+  (criar-objeto 
+   "Saída"
+   (list "TRANCADA! Sem a chave, não vou a lugar nenhum. Melhor explorar e resolver os mistérios primeiro."
+         "Finalmente, o sistema está sendo restaurado. A saída está à sua frente. Obrigado por tudo, programador... boa sorte... e adeus!")
+   void)
+  )
+
+
+; Devolve uma string de interação
+(define (press-e)
+  "Pressione E para interagir"
+  )
+
+
+; Estados dos elementos da cozinha
+(define estado-geladeira #f)
+(define estado-fogao #f)
+(define estado-pia-sup #f) ; True = Limpo e False= Sujo
+(define estado-pia-inf #f)
+(define estado-bancada-inf #f)
+(define estado-bancada-central #f) ; True= Tablet feito e False= Tablet não feito.
+(define estado-armario-verde #f)   ; True= Gaveta aberta e False= Gaveta fechada
+(define estado-armario-amarelo #f) ; True= Gaveta aberta e False= Gaveta fechada
+(define estado-armario-vermelho #f); True= Gaveta aberta e False= Gaveta fechada
+(define estado-porta-saida #f)     ; True= Porta aberta e False= Porta fechada.
+(define estado-porta-armazem #f)   ; True= Porta aberta e False= Porta fechada.
+(define estado-lava-loucas #f)
+
+
+; Funções para alterar estados
+(define (altera-estado-pia-sup)
+  (set! estado-pia-sup #t))
+
+(define (altera-estado-bancada-central)
+  (set! estado-bancada-central #t))
+
+(define (altera-estado-armario-verde)
+  (set! estado-armario-verde #t))
+
+(define (altera-estado-armario-amarelo)
+  (set! estado-armario-amarelo #t))
+
+(define (altera-estado-armario-vermelho)
+  (set! estado-armario-vermelho #t))
+
+(define (altera-estado-porta-saida)
+  (set! estado-porta-saida #t))
+
+(define (altera-estado-porta-armazem)
+  (set! estado-porta-armazem #t))
+
+;; ############################################ FINALIZADO ##################################################
+
+
+
+;; ############################################ ESTRUTURA E INSTÂNCIAS DE AMBIENTES DO JOGO ##################################################
+
+; Função para criar um ambiente.
+(define (criar-ambiente nome descricao objetos saidas enigmas)
+  (Ambiente
+   nome
+   descricao
+   objetos
+   saidas
+   enigmas)
+  )
+
+; Devolve o nome do ambiente onde o jogador se encontra.
+(define (get-nome-ambiente jogador)
+  (Ambiente-nome (Jogador-localizacao jogador))
+  )
+
+; Devolve a descrição do ambiente onde o jogador se encontra.
+(define (get-desc-ambiente jogador)
+  (Ambiente-descricao (Jogador-localizacao jogador))
+  )
+
+; Devolve os objetos do ambiente onde o jogador se encontra.
+(define (get-obj-ambiente jogador)
+  (Ambiente-objetos (Jogador-localizacao jogador))
+  )
+
+; Devolve as saídas do ambiente onde o jogador se encontra.
+(define (get-saida-ambiente jogador)
+  (Ambiente-saidas (Jogador-localizacao jogador))
+  )
+
+
+
+; Criando a instância do ambiente "Cozinha"
+(define amb-cozinha (criar-ambiente "Cozinha" "Uma cozinha futurística e caótica, com armários digitais piscando e pratos empilhados..."
+                                (list "1 Robo-Byte" "1 Geladeira" "1 Fogão" "1 Lava louças" "2 Bancadas" "2 Pias" "3 Armários")
+                                   (list "Porta do armazém" "Porta de saída") (list)))
+
+; Criando a instância do ambiente "Armazém"
+(define amb-armzem (criar-ambiente "Armazem" "Um armazém organizado, com prateleiras de ingredientes e um holograma de um robo aguardando sua lógica para revelar algo."
+                               (list "1 Robo-Byte" "10 prateleiras") (list "Porta da cozinha") (list)))
+
+
+
+;; ############################################ FINALIZADO ##################################################
+
+
+
+;; ############################################ ESTRUTURA E MANIPULAÇÃO DO JOGADOR NO JOGO ##################################################
+
+;; Instancia de jogador
+(define jogador (Jogador "" (Posicao 1050 190) '() amb-cozinha))
+
+;; Velocidade de movimento do jogador durante o mapa
+(define velocidade-jogador 30)  
+
+
+; Devolve a velocidade de movimentação do jogador
+(define (get-velocidade)
+  velocidade-jogador
+  )
+
+
+;; Atualiza os valores de jogador
+(define (atualiza novo-estado)
+  (set! jogador novo-estado)
+  )
+
+
+;; Altera o nome do jogador
+(define (altera-nome novo-nome)
+  (atualiza (struct-copy Jogador jogador [nome novo-nome]))
+  )
+
+
+; Devolve o nome do jogador
+(define (get-nome)
+  (Jogador-nome jogador)
+  )
+
+
+; Coloca " - (VOCÊ)" na frente do nome do jogador.
+(define (get-nome-dialogo)
+  (string-append (get-nome) " - (VOCÊ)")
+  )
+
+
+;; Altera a posição x do jogador
+(define (altera-posx nova-posicao-x)
+  (atualiza (struct-copy Jogador jogador
+                         [posicao (struct-copy Posicao (Jogador-posicao jogador)
+                                               [x nova-posicao-x])]))
+  )
+
+
+; Devolve a posicao x do jogador
+(define (pos-x)
+  (Posicao-x (Jogador-posicao jogador))
+  )
+
+
+;; Altera a posição y do jogador
+(define (altera-posy nova-posicao-y)
+  (atualiza (struct-copy Jogador jogador
+                         [posicao (struct-copy Posicao (Jogador-posicao jogador)
+                                               [y nova-posicao-y])]))
+  )
+
+
+; Devolve a posicao y do jogador
+(define (pos-y)
+  (Posicao-y (Jogador-posicao jogador))
+  )
+
+
+;; Altera o ambiente atual do jogador quando ele muda de sala
+(define (set-ambiente novo-ambiente)
+  (atualiza (struct-copy Jogador jogador
+                         [localizacao novo-ambiente]))
+  )
+
+
+; Devolve o ambiente atual do jogador
+(define (get-ambiente)
+  (Ambiente-nome (Jogador-localizacao jogador))
+  )
+
+
+;; Adiciona um item no inventario do jogador
+(define (add-item novo-item)
+  (atualiza (struct-copy Jogador jogador
+                         [inventario (append
+                                      (Jogador-inventario jogador) (list novo-item))]))
+  )
+
+
+;; Remove um item do inventário do jogador
+(define (rem-item item)
+  (atualiza (struct-copy Jogador jogador
+                         ; Função de alta ordem Filter e lambda
+                         [inventario (filter (lambda (x) (not (equal? x item)))
+                                             (Jogador-inventario jogador))]))
+  )
+
+
+; Devolve o inventario(lista) do jogador.
+(define (get-inventario)
+  (Jogador-inventario jogador)
+  )
+
+
+; Devolve o quantidade de itens que tem no inventario(lista)
+(define (get-tam)
+  (length (Jogador-inventario jogador))
+  )
+
+
+;; ############################################ FINALIZADO ##################################################
+
+
+
+;; ############################################# FUNÇÕES DE VERIFICAÇÃO, ABERTURA E FECHAMENTO DO INVENTÁRIO DO JOGADOR ##################################################
+
+
+; Adicionar variáveis globais para o inventário
+(define inventario-aberto #f)
+
+; Função para alternar o estado do inventário
+(define (alternar-inventario)
+  (set! inventario-aberto (not inventario-aberto))
+  (set! jogador-bloqueado? inventario-aberto))
+
+
+; Verifica se o item está com o jogador!
+(define (esta-inv? item inventario)
+  (cond
+    [(member item inventario)
+    (rem-item item)
+    #t]
+
+    [else
+     #f])
+  )
+
+;; ############################################ FINALIZADO ##################################################
+
+
+
+;; ############################################ CRIAÇÃO E GERENCIAMENTO DA NARRATIVA INICIAL DO JOGO ##################################################
+
+;; FUNÇÃO QUE CRIA A ESTRUTURA NARRATIVA
+(define (cria-struc-narrativa)
+  (Narrativa
+   (list
+     "Você é um programador que, após uma jornada cansativa de trabalho, cai no sono enquanto tenta depurar um código desordenado de um sistema de gerenciamento de restaurantes."
+     "Você se levanta atordoado, o som de panelas ecoando ao fundo. A cozinha surreal ao seu redor parece viva, mas há algo de errado: pratos empilhados balançam, armários piscam com luzes digitais..."
+     "O cronômetro na parede marca o tempo que resta. De repente, um holograma de um chef robótico aparece à sua frente."
+     "Finalmente você chegou! Bem-vindo, programador... ou deveria dizer, cozinheiro de emergência? Eu sou Byte, o assistente auxiliar deste sistema de gerenciamento de cozinha."
+     "Estamos em uma situação crítica! Um algoritmo instável saiu do controle, desorganizou o sistema da cozinha e até comprometeu o sub-chefe robô. Pilhas, filas... nada está no lugar!"
+     "Se não agirmos rápido, o caos será irreversível. Felizmente, consegui desativar temporariamente o sistema principal e o robô, nos dando um tempo limitado."
+     "Sua missão: resolver os enigmas, restaurar a ordem e retomar o controle antes que seja tarde demais. A cozinha está cheia de pistas e desafios, exigindo lógica e habilidade para ser superada. O tempo está correndo!"
+     )
+   (list
+    "D:/2 Serie - Materias - UEM/2º Semestre/Programação Funcional - Aluno/Trabalho02/Imagens/pessoa_dormindo.jpg"  
+    "D:/2 Serie - Materias - UEM/2º Semestre/Programação Funcional - Aluno/Trabalho02/Imagens/pessoa_dormindo_escuro.jpg"
+    "D:/2 Serie - Materias - UEM/2º Semestre/Programação Funcional - Aluno/Trabalho02/Imagens/escuro.png"
+    "D:/2 Serie - Materias - UEM/2º Semestre/Programação Funcional - Aluno/Trabalho02/Imagens/Byte.jpg"))
+  )
+
+
+; Devolve o nome do robo
+(define (get-nome-robo)
+  "🤖 Byte 🤖"
+)
+
+
+; Devolve o nome narrador
+(define (get-narrador)
+  "📢 Narrador 📢"
+  )
+
+
+(define (obter-nome-narrador indice)
+  (if (> indice 2)
+      (get-nome-robo)
+      (get-narrador)))
+
+
+;; Devolve o texto que está posição indice
+(define (obter-texto dados indice)
+  (list-ref (Narrativa-textos dados) indice))
+
+
+;; Devolve a imagem que está posição indice
+(define (obter-imagem dados indice)
+  (list-ref (Narrativa-imagens dados) 
+            (cond
+              [(>= indice 3) 3]
+              [else indice])))
+
+
+;; Obtém os dados da narrativa
+(define dados (cria-struc-narrativa))
+
+
+
+;; ############################################ FINALIZADO ##################################################
+
+
+
+
+;; ############################################ GESTÃO DE DIÁLOGOS E NARRATIVA DURANTE O JOGO ##################################################
+
+(define (cria-dialogo)
+  (Dialogo
+   (list
+    "Olhe para esse caos: pratos sujos empilhados, receitas embaralhadas e os pedidos dos clientes completamente desorganizados...!"
+    "Você é a nossa última esperança para restaurar a lógica e escapar deste pesadelo. Para isso, precisará resolver enigmas baseados em estruturas de dados e conceitos de programação."
+    "A cada desafio resolvido, eu liberarei uma nova pista para você. Se quiser saber mais, volte até mim para descobrir o próximo passo."
+    "Agora, vamos começar! Aqui está a sua primeira DICA: \n Sou a base principal da cozinha; sem mim, a comida não seria servida. Contudo, em minha pilha, a ordem é tudo."
+    )
+   (get-enigma-desc prato)
+   (get-enigma-desc livro)
+   (get-enigma-desc quiz)
+   (get-enigma-desc pedidos)
+   (get-enigma-desc armazem)
+   )
+  )
+
+
+(define (dialogo-fim)
+  (Dialogo-finais
+    (list "Ao lavar o último prato, algo no fundo da pia chama sua atenção. É uma chave. Você a pega e a coloca no inventário.")
+    (list "Antes de fechar o livro, uma folha de papel escorrega e cai no chão. Nela, há alguns números. Sem saber para que servem, você a coloca no inventário.")
+    (list "Resposta B: b, b, c, a, a - Resposta CORRETA! Parabéns!." "O tablet emite um leve zumbido antes de expelir um pequeno pedaço de papel. Intrigado, você o pega e o adiciona ao seu inventário.")
+    (list "Com o enigma resolvido, um barulho metálico quebra o silêncio: Uma das portas destranca sozinha, como se tivesse ficado impaciente.")
+    (list "Com a busca binária, você examina a prateleira e encontra uma chave escondida.  A chave é colocada no inventário.")
+    (list "Ao abrir uma das gavetas do armário amarelo, você encontra um papel com um '?'. Talvez os enigmas anteriores guardem algo mais... Quem sabe as senhas estejam ligadas às letras do alfabeto?")
+    (list "Você abriu uma das gavetas do Armário Vermelho. Esta é a chave para escapar do sonho e restaurar a ordem.")
+    )
+  )
+
+
+(define (byte-dicas)
+  (cond
+    [(not estado-prato)
+     (get-enigma-pis prato)]
+
+    [(not estado-livro)
+     (get-enigma-pis livro)]
+
+    [(not estado-quiz)
+     (get-enigma-pis quiz)]
+
+    [(not estado-pedidos)
+     (get-enigma-pis pedidos)]
+
+    [(not estado-armazem)
+     (get-enigma-pis armazem)]
+
+    [else
+      "A chave para a saída está escondida no armário mais privado. Somente quem entender o acesso restrito pode encontrar o caminho."]
+    )
+  )
+
+
+; Variavel das falas ao concluir um enigma
+(define enigma-feito (dialogo-fim))
+
+; Variavel das falas inicias de cada enigma
+(define dialogo (cria-dialogo))
+
+
+
+;; ############################################ FINALIZADO ##################################################
+
+
+
+; ################################################## MÉTODO DE EXPLORAÇÃO DO JOGADOR #################################################
+
+; Variavel para controlar a exibição da exploração
+(define mapa-aberto #f)
+
+; Função para alternar o estado do inventário
+(define (alternar-mapa)
+  (set! mapa-aberto (not mapa-aberto))
+  (set! jogador-bloqueado? mapa-aberto))
+
+
+; Versão usando recursão
+(define (desenhar-texto-quebrado dc texto x y largura)
+  (define altura-linha 30)
+  
+  ; Função auxiliar que processa uma palavra e retorna os novos valores de linha e y
+  (define (processar-palavra palavra linha atual-y)
+    (define linha-teste (if (string=? linha "") 
+                            palavra 
+                            (string-append linha " " palavra)))
+    (define largura-teste (car (call-with-values 
+                                 (lambda () (send dc get-text-extent linha-teste)) 
+                                 list)))
+    (if (<= largura-teste largura)
+        (values linha-teste atual-y)
+        (begin
+          (send dc draw-text linha x atual-y)
+          (values palavra (+ atual-y altura-linha)))))
+  
+  ; Função recursiva principal que processa a lista de palavras
+  (define (processar-palavras palavras linha atual-y)
+    (cond
+      [(empty? palavras)
+       (when (not (string=? linha ""))
+         (send dc draw-text linha x atual-y))]
+      [else
+       (define-values (nova-linha novo-y)
+         (processar-palavra (first palavras) linha atual-y))
+       (processar-palavras (rest palavras) nova-linha novo-y)]))
+  
+  ; Inicia o processamento recursivo
+  (processar-palavras (string-split texto) "" y))
+
+
+
+; Função recursiva para desenhar objetos
+(define (desenhar-objetos-rec dc objetos y)
+  (cond 
+    [(empty? objetos) y]  ; Caso base: retorna a última posição y
+    [else
+     (let ([obj (first objetos)])
+       (send dc draw-text (string-append "• " obj) 400 y)
+       (desenhar-objetos-rec dc 
+                            (rest objetos) 
+                            (+ y 25)))]))  ; Recursão com próximo y
+
+
+
+; Função recursiva para desenhar as saídas do ambiente
+(define (desenhar-saidas-rec dc saidas y)
+  (cond
+    [(empty? saidas) y]  ; Caso base: retorna a última posição y
+    [else
+     (let ([saida (first saidas)])
+       (send dc draw-text (string-append "→ " saida) 400 y)
+       (desenhar-saidas-rec dc 
+                           (rest saidas) 
+                           (+ y 25)))]))  ; Recursão com próximo y
+
+
+;; ############################################ FINALIZADO ##################################################
+
+
+; ################################################## MÉTODO DE INTERAÇÃO DO JOGADOR #################################################
+
+ ; Define o texto atual do diálogo como vazio
+(define texto-dialogo-atual "")
+
+ ; Define o personagem atual que está falando como vazio
+(define falante-atual "")
+
+; Define se o diálogo deve ser exibido (inicialmente falso)
+(define mostrar-dialogo #f)
+
+; Lista de mensagens ainda não mostradas
+(define mensagens-restantes '())
+
+; Largura máxima do texto em pixels
+(define largura-maxima-texto 1450)   
+
+; Define se o jogador está bloqueado (inicialmente falso)
+(define jogador-bloqueado? #f)     
+
+; Espaçamento entre as linhas
+(define altura-linha 40)
+
+
+; === FUNÇÕES INTERAÇÃO DO SISTEMA DE DIÁLOGO ===
+(define (non-empty-string? str)
+  (not (string=? str "")))
+
+
+(define (quebrar-texto dc texto largura-max)
+  (let* ([palavras (string-split texto)])
+    ; Configura a fonte antes de medir o texto
+    (send dc set-font (make-object font% 24 'default))
+    
+    ; Função auxiliar recursiva
+    (define (quebrar-texto-rec palavras linha-atual linhas)
+      (if (null? palavras)
+          ; Caso base: se não há mais palavras, adiciona a última linha se não estiver vazia
+          (if (non-empty-string? linha-atual)
+              (append linhas (list linha-atual))
+              linhas)
+          
+          ; Caso recursivo
+          (let* ([palavra (car palavras)]
+                 [espaco (if (string=? linha-atual "") "" " ")]
+                 [nova-linha (string-append linha-atual espaco palavra)]
+                 [largura (let-values ([(w h d a) (send dc get-text-extent nova-linha)])
+                           w)])
+            
+            (if (> largura largura-max)
+                ; Se exceder a largura máxima
+                (if (non-empty-string? linha-atual)
+                    (quebrar-texto-rec palavras "" (append linhas (list linha-atual)))
+                    (quebrar-texto-rec (cdr palavras) palavra linhas))
+                ; Se não exceder a largura máxima
+                (quebrar-texto-rec (cdr palavras) nova-linha linhas)))))
+    
+    ; Inicia a recursão com a primeira palavra
+    (quebrar-texto-rec palavras "" '())))
+
+
+(define (proxima-mensagem)
+  (when (not (null? mensagens-restantes))
+    (mostrar-mensagem-dialogo falante-atual (car mensagens-restantes))
+    (set! mensagens-restantes (cdr mensagens-restantes))))
+
+
+(define (esconder-dialogo)
+  (if (null? mensagens-restantes)
+      (begin
+        (set! mostrar-dialogo #f)
+        (set! jogador-bloqueado? #f))
+      (proxima-mensagem)))
+
+; Primeiro, vamos adicionar uma variável para controlar se estamos no diálogo da pia
+(define dialogo-pia-ativo #f)
+(define dialogo-pia-finalizado #f)
+
+
+(define (mostrar-mensagem-dialogo falante texto)
+  (set! falante-atual falante)
+  (set! texto-dialogo-atual texto)
+  (set! mostrar-dialogo #t)
+  (set! jogador-bloqueado? #t)
+  )
+
+
+
+(define (iniciar-sequencia-dialogos falante textos)
+  (set! mensagens-restantes (cdr textos))
+  (mostrar-mensagem-dialogo falante (car textos)))
+
+
+
+;; ############################################ FINALIZADO ##################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+

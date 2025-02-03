@@ -1,0 +1,6 @@
+#lang racket/gui
+
+
+(require "Implementacao_grafica.rkt")
+
+(abrirTelaInicial)
